@@ -1,0 +1,22 @@
+{ 
+	"name": "davetwitter", 
+	"description": "Basic twitter identity for server apps.",
+	"author": "Dave Winer <dave@smallpicture.com>",
+	"version": "0.4.0",
+	"scripts": {
+		"start": "node main.js"
+		},
+	"repository": {
+		"type" : "git",
+		"url" : "https://github.com/scripting/twitter.git"
+		},
+	"dependencies" : {
+		"node-twitter-api": "*",
+		"davehttp": "*",
+		"daveutils": "*"
+		}, 
+	"license": "MIT",
+	"engines": { 
+		"node": "*"
+		}
+	}
