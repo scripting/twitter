@@ -1,4 +1,4 @@
-var myVersion = "0.4.0", myProductName = "davetwitter"; 
+var myVersion = "0.4.1", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
