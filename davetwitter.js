@@ -1,4 +1,4 @@
-var myVersion = "0.4.1", myProductName = "davetwitter"; 
+var myVersion = "0.4.11", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -13,7 +13,10 @@ var config = {
 	myDomain: "localhost",
 	twitterConsumerKey: undefined,
 	twitterConsumerSecret: undefined,
-	flForceTwitterLogin: false
+	flForceTwitterLogin: false,
+	httpRequestCallback: function (theRequest) {
+		return (false); //not consumed
+		}
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
@@ -67,20 +70,9 @@ function findRequestToken (theRequestToken) {
 		}
 	return (undefined);
 	}
-
-function start (configParam, callback) {
-	if (configParam !== undefined) {
-		for (x in configParam) {
-			config [x] = configParam [x];
-			}
-		}
-	console.log ("davetwitter.start: config == " + utils.jsonStringify (config));
-	
-	var httpConfig = {
-		port: config.httpPort
-		};
-	davehttp.start (httpConfig, function (theRequest) {
-		console.log ("davetwitter: theRequest.lowerpath == " + theRequest.lowerpath);
+function handleRequest (theRequest) {
+	console.log ("davetwitter: theRequest.lowerpath == " + theRequest.lowerpath);
+	if (!config.httpRequestCallback (theRequest)) { //it wasn't handled by the higher level code
 		switch (theRequest.lowerpath) {
 			case "/connect": 
 				var twitter = new twitterAPI ({
@@ -90,7 +82,9 @@ function start (configParam, callback) {
 					});
 				twitter.getRequestToken (function (error, requestToken, requestTokenSecret, results) {
 					if (error) {
-						errorResponse (error); //6/30/14 by DW
+						
+						
+						theRequest.httpReturn (500, "text/plain", error.data);
 						}
 					else {
 						saveRequestToken (requestToken, requestTokenSecret);
@@ -128,8 +122,50 @@ function start (configParam, callback) {
 						}
 					});
 				return;
+			case "/getmyscreenname":
+				var token = theRequest.params.oauth_token;
+				var tokenSecret = theRequest.params.oauth_token_secret;
+				getScreenName (token, tokenSecret, function (screenName) {
+					var obj = {
+						screenName: screenName
+						};
+					theRequest.httpReturn (200, "application/json", utils.jsonStringify (obj));
+					});
+				return;
+			case "/getuserinfo": //11/19/17 by DW
+				var token = theRequest.params.oauth_token;
+				var tokenSecret = theRequest.params.oauth_token_secret;
+				var screenName = theRequest.params.screen_name;
+				var params = {screen_name: screenName};
+				var twitter = newTwitter ();
+				twitter.users ("show", params, token, tokenSecret, function (error, data, response) {
+					if (error) {
+						theRequest.httpReturn (500, "text/plain", error.data);
+						}
+					else {
+						theRequest.httpReturn (200, "application/json", utils.jsonStringify (data));
+						}
+					});
+				return;
 			}
 		theRequest.httpReturn (404, "text/plain", "Not found.");
+		}
+	}
+
+function start (configParam, callback) {
+	if (configParam !== undefined) {
+		for (x in configParam) {
+			config [x] = configParam [x];
+			}
+		}
+	console.log ("davetwitter.start: config == " + utils.jsonStringify (config));
+	
+	var httpConfig = {
+		port: config.httpPort,
+		flAllowAccessFromAnywhere: true
+		};
+	davehttp.start (httpConfig, function (theRequest) {
+		handleRequest (theRequest);
 		});
 	}
 

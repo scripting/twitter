@@ -1,0 +1,14 @@
+{ 
+	"name": "test", 
+	"description": "test.",
+	"author": "Dave Winer <dave@smallpicture.com>",
+	"version": "0.4.0",
+	"dependencies" : {
+		"davetwitter": "*",
+		"daveutils": "*"
+		}, 
+	"license": "MIT",
+	"engines": { 
+		"node": "*"
+		}
+	}
