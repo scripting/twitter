@@ -1,8 +1,9 @@
-var myVersion = "0.4.11", myProductName = "davetwitter"; 
+var myVersion = "0.4.18", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
 const utils = require ("daveutils");
+const request = require ("request");
 const davehttp = require ("davehttp");
 
 exports.start = start; 
@@ -71,6 +72,12 @@ function findRequestToken (theRequestToken) {
 	return (undefined);
 	}
 function handleRequest (theRequest) {
+	
+	function errorResponse (errorval) {
+		theRequest.httpReturn (500, "text/plain", errorval);
+		}
+	
+	
 	console.log ("davetwitter: theRequest.lowerpath == " + theRequest.lowerpath);
 	if (!config.httpRequestCallback (theRequest)) { //it wasn't handled by the higher level code
 		switch (theRequest.lowerpath) {
@@ -147,6 +154,35 @@ function handleRequest (theRequest) {
 						}
 					});
 				return;
+			case "/derefurl": //11/19/17 by DW
+				var token = theRequest.params.oauth_token;
+				var tokenSecret = theRequest.params.oauth_token_secret;
+				var shortUrl = theRequest.params.url;
+				getScreenName (token, tokenSecret, function (screenName) {
+					if (screenName === undefined) {
+						theRequest.httpReturn (500, "text/plain", "Can't get the deref the URL because the accessToken is not valid.");
+						}
+					else {
+						var myRequest = {
+							method: "HEAD", 
+							url: shortUrl, 
+							followAllRedirects: true
+							};
+						request (myRequest, function (error, response) {
+							if (error) {
+								theRequest.httpReturn (500, "text/plain", "Can't get the deref the URL because there was an error making the HTTP request.");
+								}
+							else {
+								var myResponse = {
+									url: shortUrl,
+									longurl: response.request.href
+									};
+								theRequest.httpReturn (200, "application/json", utils.jsonStringify (myResponse));
+								}
+							});
+						}
+					});
+				return;
 			}
 		theRequest.httpReturn (404, "text/plain", "Not found.");
 		}
@@ -167,6 +203,10 @@ function start (configParam, callback) {
 	davehttp.start (httpConfig, function (theRequest) {
 		handleRequest (theRequest);
 		});
+	
+	if (callback !== undefined) { //12/31/17 by DW
+		callback ();
+		}
 	}
 
 
