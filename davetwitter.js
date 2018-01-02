@@ -1,4 +1,4 @@
-var myVersion = "0.4.18", myProductName = "davetwitter"; 
+var myVersion = "0.5.2", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -8,6 +8,7 @@ const davehttp = require ("davehttp");
 
 exports.start = start; 
 exports.getScreenName = getScreenName;
+exports.getUserInfo = getUserInfo; //1/2/18 by DW
 
 var config = {
 	httpPort: 1401,
@@ -15,6 +16,8 @@ var config = {
 	twitterConsumerKey: undefined,
 	twitterConsumerSecret: undefined,
 	flForceTwitterLogin: false,
+	flLogToConsole: false, //1/2/18 by DW
+	flAllowAccessFromAnywhere: true, //1/2/18 by DW
 	httpRequestCallback: function (theRequest) {
 		return (false); //not consumed
 		}
@@ -55,6 +58,17 @@ function getScreenName (accessToken, accessTokenSecret, callback) {
 		});
 	}
 	
+function getUserInfo (accessToken, accessTokenSecret, screenName, callback) { //1/2/18 by DW
+	var params = {screen_name: screenName};
+	newTwitter ().users ("show", params, accessToken, accessTokenSecret, function (error, data, response) {
+		if (error) {
+			callback (error);
+			}
+		else {
+			callback (undefined, data);
+			}
+		});
+	}
 function saveRequestToken (requestToken, requestTokenSecret) {
 	var obj = new Object ();
 	obj.rt = requestToken;
@@ -72,13 +86,9 @@ function findRequestToken (theRequestToken) {
 	return (undefined);
 	}
 function handleRequest (theRequest) {
-	
 	function errorResponse (errorval) {
 		theRequest.httpReturn (500, "text/plain", errorval);
 		}
-	
-	
-	console.log ("davetwitter: theRequest.lowerpath == " + theRequest.lowerpath);
 	if (!config.httpRequestCallback (theRequest)) { //it wasn't handled by the higher level code
 		switch (theRequest.lowerpath) {
 			case "/connect": 
@@ -89,8 +99,6 @@ function handleRequest (theRequest) {
 					});
 				twitter.getRequestToken (function (error, requestToken, requestTokenSecret, results) {
 					if (error) {
-						
-						
 						theRequest.httpReturn (500, "text/plain", error.data);
 						}
 					else {
@@ -187,7 +195,6 @@ function handleRequest (theRequest) {
 		theRequest.httpReturn (404, "text/plain", "Not found.");
 		}
 	}
-
 function start (configParam, callback) {
 	if (configParam !== undefined) {
 		for (x in configParam) {
@@ -198,7 +205,8 @@ function start (configParam, callback) {
 	
 	var httpConfig = {
 		port: config.httpPort,
-		flAllowAccessFromAnywhere: true
+		flLogToConsole: config.flLogToConsole,
+		flAllowAccessFromAnywhere: config.flAllowAccessFromAnywhere
 		};
 	davehttp.start (httpConfig, function (theRequest) {
 		handleRequest (theRequest);
@@ -208,5 +216,3 @@ function start (configParam, callback) {
 		callback ();
 		}
 	}
-
-
