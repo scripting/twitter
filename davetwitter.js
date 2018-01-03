@@ -1,4 +1,4 @@
-var myVersion = "0.5.2", myProductName = "davetwitter"; 
+var myVersion = "0.5.3", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -18,6 +18,7 @@ var config = {
 	flForceTwitterLogin: false,
 	flLogToConsole: false, //1/2/18 by DW
 	flAllowAccessFromAnywhere: true, //1/2/18 by DW
+	flPostEnabled: false, //1/3/18 by DW
 	httpRequestCallback: function (theRequest) {
 		return (false); //not consumed
 		}
@@ -206,7 +207,8 @@ function start (configParam, callback) {
 	var httpConfig = {
 		port: config.httpPort,
 		flLogToConsole: config.flLogToConsole,
-		flAllowAccessFromAnywhere: config.flAllowAccessFromAnywhere
+		flAllowAccessFromAnywhere: config.flAllowAccessFromAnywhere,
+		flPostEnabled: config.flPostEnabled
 		};
 	davehttp.start (httpConfig, function (theRequest) {
 		handleRequest (theRequest);
