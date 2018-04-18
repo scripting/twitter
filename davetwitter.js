@@ -1,4 +1,4 @@
-var myVersion = "0.5.3", myProductName = "davetwitter"; 
+var myVersion = "0.5.4", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -21,7 +21,8 @@ var config = {
 	flPostEnabled: false, //1/3/18 by DW
 	httpRequestCallback: function (theRequest) {
 		return (false); //not consumed
-		}
+		},
+	blockedAddresses: new Array () //4/17/18 by DW
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
@@ -208,7 +209,8 @@ function start (configParam, callback) {
 		port: config.httpPort,
 		flLogToConsole: config.flLogToConsole,
 		flAllowAccessFromAnywhere: config.flAllowAccessFromAnywhere,
-		flPostEnabled: config.flPostEnabled
+		flPostEnabled: config.flPostEnabled,
+		blockedAddresses: config.blockedAddresses //4/17/18 by DW
 		};
 	davehttp.start (httpConfig, function (theRequest) {
 		handleRequest (theRequest);
