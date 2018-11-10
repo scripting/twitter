@@ -1,4 +1,4 @@
-var myVersion = "0.5.4", myProductName = "davetwitter"; 
+var myVersion = "0.5.5", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -190,6 +190,33 @@ function handleRequest (theRequest) {
 								theRequest.httpReturn (200, "application/json", utils.jsonStringify (myResponse));
 								}
 							});
+						}
+					});
+				return;
+			case "/getembedcode": //11/10/18 by DW
+				//https://dev.twitter.com/docs/api/1/get/statuses/oembed
+				
+				var url = "https://api.twitter.com/1/statuses/oembed.json?id=" + theRequest.params.id;
+				
+				function addParam (name) {
+					if (theRequest.params [name] !== undefined) {
+						url += "&" + name + "=" + theRequest.params [name];
+						}
+					}
+				addParam ("maxwidth");
+				addParam ("hide_media");
+				addParam ("hide_thread");
+				addParam ("omit_script");
+				addParam ("align");
+				addParam ("related");
+				addParam ("lang");
+				
+				request (url, function (error, response, body) {
+					if (!error && (response.statusCode == 200)) {
+						theRequest.httpReturn (200, "text/plain", body);
+						}
+					else {
+						theRequest.httpReturn (500, "text/plain", utils.jsonStringify (error));
 						}
 					});
 				return;
