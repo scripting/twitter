@@ -1,4 +1,4 @@
-var myVersion = "0.5.5", myProductName = "davetwitter"; 
+var myVersion = "0.5.7", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -87,9 +87,29 @@ function findRequestToken (theRequestToken) {
 		}
 	return (undefined);
 	}
+function sendTweet (accessToken, accessTokenSecret, status, inReplyToId, callback) {
+	var params = {status: status, in_reply_to_status_id: inReplyToId};
+	newTwitter ().statuses ("update", params, accessToken, accessTokenSecret, callback);
+	}
 function handleRequest (theRequest) {
-	function errorResponse (errorval) {
-		theRequest.httpReturn (500, "text/plain", errorval);
+	var params = theRequest.params;
+	function returnData (jstruct) {
+		if (jstruct === undefined) {
+			jstruct = {};
+			}
+		theRequest.httpReturn (200, "application/json", utils.jsonStringify (jstruct));
+		}
+	function returnError (jstruct) {
+		console.log ("returnError: jstruct == " + utils.jsonStringify (jstruct));
+		theRequest.httpReturn (500, "application/json", utils.jsonStringify (jstruct));
+		}
+	function httpReturn (err, jstruct) {
+		if (err) {
+			returnError (err);
+			}
+		else {
+			returnData (jstruct);
+			}
 		}
 	if (!config.httpRequestCallback (theRequest)) { //it wasn't handled by the higher level code
 		switch (theRequest.lowerpath) {
@@ -219,6 +239,9 @@ function handleRequest (theRequest) {
 						theRequest.httpReturn (500, "text/plain", utils.jsonStringify (error));
 						}
 					});
+				return;
+			case "/tweet": //12/14/18 by DW
+				sendTweet (params.oauth_token, params.oauth_token_secret, params.status, params.in_reply_to_status_id, httpReturn);
 				return;
 			}
 		theRequest.httpReturn (404, "text/plain", "Not found.");
