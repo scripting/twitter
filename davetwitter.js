@@ -1,4 +1,4 @@
-var myVersion = "0.5.7", myProductName = "davetwitter"; 
+var myVersion = "0.5.8", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -9,6 +9,7 @@ const davehttp = require ("davehttp");
 exports.start = start; 
 exports.getScreenName = getScreenName;
 exports.getUserInfo = getUserInfo; //1/2/18 by DW
+exports.sendTweet = sendTweet; //12/17/18 by DW
 
 var config = {
 	httpPort: 1401,
