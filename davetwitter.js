@@ -1,4 +1,4 @@
-var myVersion = "0.5.8", myProductName = "davetwitter"; 
+var myVersion = "0.5.10", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -61,6 +61,18 @@ function getScreenName (accessToken, accessTokenSecret, callback) {
 		});
 	}
 	
+function deleteInScreenNameCache (accessToken, accessTokenSecret, callback) { //3/24/19 by DW
+	for (var i = 0; i < screenNameCache.length; i++) {
+		var obj = screenNameCache [i];
+		if ((obj.accessToken == accessToken) && (obj.accessTokenSecret == accessTokenSecret)) {
+			callback (obj);
+			screenNameCache.splice (i, 1);
+			return;
+			}
+		}
+	callback ({
+		});
+	}
 function getUserInfo (accessToken, accessTokenSecret, screenName, callback) { //1/2/18 by DW
 	var params = {screen_name: screenName};
 	newTwitter ().users ("show", params, accessToken, accessTokenSecret, function (error, data, response) {
@@ -134,6 +146,13 @@ function handleRequest (theRequest) {
 						theRequest.sysResponse.writeHead (302, {"location": twitterOauthUrl});
 						theRequest.sysResponse.end ("302 REDIRECT");    
 						}
+					});
+				return;
+			case "/disconnect": //3/24/19 by DW
+				var token = theRequest.params.oauth_token;
+				var tokenSecret = theRequest.params.oauth_token_secret;
+				deleteInScreenNameCache (token, tokenSecret, function (data) {
+					theRequest.httpReturn (200, "application/json", utils.jsonStringify (data));
 					});
 				return;
 			case "/callbackfromtwitter":
