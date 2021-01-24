@@ -1,9 +1,12 @@
 { 
 	"name": "davetwitter", 
 	"description": "Basic twitter functionality for server apps.",
-	"author": "Dave Winer <dave@smallpicture.com>",
-	"version": "0.5.10",
+	"author": "Dave Winer <dave@scripting.com>",
+	"version": "0.5.19",
 	"main": "davetwitter.js",
+	"files": [
+		"davetwitter.js"
+		],
 	"scripts": {
 		"start": "node main.js"
 		},

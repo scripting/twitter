@@ -1,4 +1,4 @@
-var myVersion = "0.5.10", myProductName = "davetwitter"; 
+var myVersion = "0.5.19", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -21,6 +21,9 @@ var config = {
 	flAllowAccessFromAnywhere: true, //1/2/18 by DW
 	flPostEnabled: false, //1/3/18 by DW
 	httpRequestCallback: function (theRequest) {
+		return (false); //not consumed
+		},
+	http404Callback: function (theRequest) { //1/24/21 by DW
 		return (false); //not consumed
 		},
 	blockedAddresses: new Array () //4/17/18 by DW
@@ -127,11 +130,13 @@ function handleRequest (theRequest) {
 	if (!config.httpRequestCallback (theRequest)) { //it wasn't handled by the higher level code
 		switch (theRequest.lowerpath) {
 			case "/connect": 
+				var urlCallback = "http://" + config.myDomain + "/callbackFromTwitter?redirectUrl=" + encodeURIComponent (theRequest.params.redirect_url);
 				var twitter = new twitterAPI ({
 					consumerKey: config.twitterConsumerKey,
 					consumerSecret: config.twitterConsumerSecret,
-					callback: "http://" + config.myDomain + "/callbackFromTwitter?redirectUrl=" + encodeURIComponent (theRequest.params.redirect_url)
+					callback: urlCallback
 					});
+				console.log ("davetwitter/handleRequest: urlCallback == " + urlCallback); //4/19/19 by DW
 				twitter.getRequestToken (function (error, requestToken, requestTokenSecret, results) {
 					if (error) {
 						theRequest.httpReturn (500, "text/plain", error.data);
@@ -263,8 +268,24 @@ function handleRequest (theRequest) {
 			case "/tweet": //12/14/18 by DW
 				sendTweet (params.oauth_token, params.oauth_token_secret, params.status, params.in_reply_to_status_id, httpReturn);
 				return;
+			case "/configuration": //8/15/19 by DW
+				var twitter = newTwitter ();
+				var params = {};
+				var accessToken = theRequest.params.oauth_token;
+				var accessTokenSecret = theRequest.params.oauth_token_secret;
+				twitter.help ("configuration", params, accessToken, accessTokenSecret, function (err, data, response) {
+					if (err) {
+						returnError (err);
+						}
+					else {
+						returnData (data);
+						}
+					});
+				return;
 			}
-		theRequest.httpReturn (404, "text/plain", "Not found.");
+		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
+			theRequest.httpReturn (404, "text/plain", "Not found.");
+			}
 		}
 	}
 function start (configParam, callback) {
