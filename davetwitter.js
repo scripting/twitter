@@ -1,4 +1,4 @@
-var myVersion = "0.5.19", myProductName = "davetwitter"; 
+var myVersion = "0.5.24", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -10,6 +10,8 @@ exports.start = start;
 exports.getScreenName = getScreenName;
 exports.getUserInfo = getUserInfo; //1/2/18 by DW
 exports.sendTweet = sendTweet; //12/17/18 by DW
+exports.getTimeline = getTimeline; //3/8/21 by DW
+exports.getTweet = getTweet; //3/8/21 by DW
 
 var config = {
 	httpPort: 1401,
@@ -107,8 +109,31 @@ function sendTweet (accessToken, accessTokenSecret, status, inReplyToId, callbac
 	var params = {status: status, in_reply_to_status_id: inReplyToId};
 	newTwitter ().statuses ("update", params, accessToken, accessTokenSecret, callback);
 	}
+
+function getTimeline (accessToken, accessTokenSecret, whichTimeline, userId, sinceId, callback) { //2/11/21 by DW
+	var twitter = newTwitter ();
+	var params = {
+		user_id: userId, 
+		trim_user: "false",
+		tweet_mode: "extended"
+		};
+	if (sinceId !== undefined) {
+		params.since_id = sinceId;
+		}
+	newTwitter ().getTimeline (whichTimeline, params, accessToken, accessTokenSecret, callback);
+	}
+function getTweet (id, callback) { //3/8/21 by DW
+	var params = {
+		id, 
+		tweet_mode: "extended"
+		};
+	newTwitter ().statuses ("show", params, undefined, undefined, callback);
+	}
+
 function handleRequest (theRequest) {
 	var params = theRequest.params;
+	const token = params.oauth_token;
+	const secret = params.oauth_token_secret;
 	function returnData (jstruct) {
 		if (jstruct === undefined) {
 			jstruct = {};
@@ -154,9 +179,7 @@ function handleRequest (theRequest) {
 					});
 				return;
 			case "/disconnect": //3/24/19 by DW
-				var token = theRequest.params.oauth_token;
-				var tokenSecret = theRequest.params.oauth_token_secret;
-				deleteInScreenNameCache (token, tokenSecret, function (data) {
+				deleteInScreenNameCache (token, secret, function (data) {
 					theRequest.httpReturn (200, "application/json", utils.jsonStringify (data));
 					});
 				return;
@@ -185,9 +208,7 @@ function handleRequest (theRequest) {
 					});
 				return;
 			case "/getmyscreenname":
-				var token = theRequest.params.oauth_token;
-				var tokenSecret = theRequest.params.oauth_token_secret;
-				getScreenName (token, tokenSecret, function (screenName) {
+				getScreenName (token, secret, function (screenName) {
 					var obj = {
 						screenName: screenName
 						};
@@ -195,12 +216,10 @@ function handleRequest (theRequest) {
 					});
 				return;
 			case "/getuserinfo": //11/19/17 by DW
-				var token = theRequest.params.oauth_token;
-				var tokenSecret = theRequest.params.oauth_token_secret;
 				var screenName = theRequest.params.screen_name;
 				var params = {screen_name: screenName};
 				var twitter = newTwitter ();
-				twitter.users ("show", params, token, tokenSecret, function (error, data, response) {
+				twitter.users ("show", params, token, secret, function (error, data, response) {
 					if (error) {
 						theRequest.httpReturn (500, "text/plain", error.data);
 						}
@@ -210,10 +229,8 @@ function handleRequest (theRequest) {
 					});
 				return;
 			case "/derefurl": //11/19/17 by DW
-				var token = theRequest.params.oauth_token;
-				var tokenSecret = theRequest.params.oauth_token_secret;
 				var shortUrl = theRequest.params.url;
-				getScreenName (token, tokenSecret, function (screenName) {
+				getScreenName (token, secret, function (screenName) {
 					if (screenName === undefined) {
 						theRequest.httpReturn (500, "text/plain", "Can't get the deref the URL because the accessToken is not valid.");
 						}
@@ -281,6 +298,15 @@ function handleRequest (theRequest) {
 						returnData (data);
 						}
 					});
+				return;
+			case "/getmymentions": //2/11/21 by DW
+				getTimeline (token, secret, "mentions", params.user_id, params.since_id, httpReturn)
+				return;
+			case "/gettimeline": //2/14/21 by DW
+				getTimeline (token, secret, params.whichtimeline, params.user_id, params.since_id, httpReturn)
+				return;
+			case "/gettweet": //3/8/21 by DW
+				getTweet (params.id, httpReturn)
 				return;
 			}
 		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
