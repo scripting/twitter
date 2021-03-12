@@ -1,4 +1,4 @@
-var myVersion = "0.5.24", myProductName = "davetwitter"; 
+var myVersion = "0.5.29", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -11,7 +11,10 @@ exports.getScreenName = getScreenName;
 exports.getUserInfo = getUserInfo; //1/2/18 by DW
 exports.sendTweet = sendTweet; //12/17/18 by DW
 exports.getTimeline = getTimeline; //3/8/21 by DW
+exports.normalizeTimeString = normalizeTimeString; //3/11/21 by DW
+exports.getTweetUrl = getTweetUrl; //3/12/21 by DW
 exports.getTweet = getTweet; //3/8/21 by DW
+exports.getThread = getThread; //3/11/21 by DW
 
 var config = {
 	httpPort: 1401,
@@ -28,7 +31,9 @@ var config = {
 	http404Callback: function (theRequest) { //1/24/21 by DW
 		return (false); //not consumed
 		},
-	blockedAddresses: new Array () //4/17/18 by DW
+	blockedAddresses: new Array (), //4/17/18 by DW
+	cacheFolder: "data/cache/", //3/11/21 by DW
+	flUseCache: true //3/11/21 by DW
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
@@ -109,7 +114,6 @@ function sendTweet (accessToken, accessTokenSecret, status, inReplyToId, callbac
 	var params = {status: status, in_reply_to_status_id: inReplyToId};
 	newTwitter ().statuses ("update", params, accessToken, accessTokenSecret, callback);
 	}
-
 function getTimeline (accessToken, accessTokenSecret, whichTimeline, userId, sinceId, callback) { //2/11/21 by DW
 	var twitter = newTwitter ();
 	var params = {
@@ -120,14 +124,112 @@ function getTimeline (accessToken, accessTokenSecret, whichTimeline, userId, sin
 	if (sinceId !== undefined) {
 		params.since_id = sinceId;
 		}
+	
 	newTwitter ().getTimeline (whichTimeline, params, accessToken, accessTokenSecret, callback);
 	}
-function getTweet (id, callback) { //3/8/21 by DW
+function getTweetFromTwitter (accessToken, accessTokenSecret, id, callback) { //3/8/21 by DW
 	var params = {
 		id, 
 		tweet_mode: "extended"
 		};
-	newTwitter ().statuses ("show", params, undefined, undefined, callback);
+	newTwitter ().statuses ("show", params, accessToken, accessTokenSecret, callback);
+	}
+function getTweet (accessToken, accessTokenSecret, id, callback) { //3/11/21 by DW
+	var f = config.cacheFolder + "tweets/" + id + ".json";
+	utils.sureFilePath (f, function () {
+		function getFromTwitter () {
+			getTweetFromTwitter (accessToken, accessTokenSecret, id, function (err, theTweet) {
+				if (err) {
+					callback (err);
+					}
+				else {
+					callback (undefined, theTweet);
+					fs.writeFile (f, utils.jsonStringify (theTweet), function (err) {
+						if (err) {
+							console.log ("getTweet: failed to write tweet to cache, err.message == " + err.message + ".");
+							}
+						});
+					}
+				});
+			}
+		fs.readFile (f, function (err, jsontext) {
+			if (err) {
+				getFromTwitter ();
+				}
+			else {
+				try {
+					callback (undefined, JSON.parse (jsontext));
+					}
+				catch (err) {
+					getFromTwitter ();
+					}
+				}
+			});
+		});
+	}
+function normalizeTimeString (when) { //3/11/21 by DW -- return a GMT-based time string
+	when = new Date (when);
+	return (when.toUTCString ());
+	}
+function getTweetUrl (theTweet) { //3/12/21 by DW
+	try {
+		return (theTweet.user.entities.url.urls [0].expanded_url);
+		}
+	catch (err) {
+		return (undefined);
+		}
+	}
+function getThread (accessToken, accessTokenSecret, idthread, callback) { //3/11/21 by DW
+	getTweet (accessToken, accessTokenSecret, idthread, function (err, theTopTweet) {
+		if (err) {
+			callback (err);
+			}
+		else {
+			var theThread = { //this is what we return to caller
+				author: {
+					name: theTopTweet.user.name,
+					description: theTopTweet.user.description,
+					screenname: theTopTweet.user.screen_name,
+					when: normalizeTimeString (theTopTweet.created_at),
+					url: getTweetUrl (theTopTweet),
+					id: theTopTweet.id_str
+					},
+				tweets: new Array ()
+				};
+			function pushTweet (theTweet) {
+				theThread.tweets.push ({
+					text: theTweet.full_text,
+					id: theTweet.id_str,
+					when: normalizeTimeString (theTweet.created_at),
+					parent: theTweet.in_reply_to_status_id_str
+					});
+				}
+			function isInThread (theTweet) {
+				var flInThread = false, idInReplyTo = theTweet.in_reply_to_status_id_str;
+				theThread.tweets.forEach (function (item) { //return true if it's in reply to something already in thread
+					if (item.id == idInReplyTo) {
+						flInThread = true;
+						}
+					});
+				return (flInThread);
+				}
+			pushTweet (theTopTweet);
+			getTimeline (accessToken, accessTokenSecret, "user_timeline", theTopTweet.user.id_str, idthread, function (err, theTimeline) {
+				if (err) {
+					callback (err);
+					}
+				else {
+					for (var i = theTimeline.length - 1; i >= 0; i--) {
+						var theTweet = theTimeline [i];
+						if (isInThread (theTweet)) {
+							pushTweet (theTweet);
+							}
+						}
+					callback (undefined, theThread);
+					}
+				});
+			}
+		});
 	}
 
 function handleRequest (theRequest) {
@@ -306,7 +408,10 @@ function handleRequest (theRequest) {
 				getTimeline (token, secret, params.whichtimeline, params.user_id, params.since_id, httpReturn)
 				return;
 			case "/gettweet": //3/8/21 by DW
-				getTweet (params.id, httpReturn)
+				getTweet (token, secret, params.id, httpReturn)
+				return;
+			case "/getthread": //3/12/21 by DW
+				getThread (token, secret, params.id, httpReturn)
 				return;
 			}
 		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
@@ -314,6 +419,7 @@ function handleRequest (theRequest) {
 			}
 		}
 	}
+
 function start (configParam, callback) {
 	if (configParam !== undefined) {
 		for (x in configParam) {
