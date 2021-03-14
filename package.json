@@ -2,7 +2,7 @@
 	"name": "davetwitter", 
 	"description": "Basic twitter functionality for server apps.",
 	"author": "Dave Winer <dave@scripting.com>",
-	"version": "0.5.34",
+	"version": "0.5.40",
 	"main": "davetwitter.js",
 	"files": [
 		"davetwitter.js"

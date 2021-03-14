@@ -1,4 +1,4 @@
-var myVersion = "0.5.34", myProductName = "davetwitter"; 
+var myVersion = "0.5.40", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -256,57 +256,87 @@ function getTweetUrl (theTweet) { //3/12/21 by DW
 		return (undefined);
 		}
 	}
-function getThread (accessToken, accessTokenSecret, idthread, callback) { //3/11/21 by DW
-	getTweet (accessToken, accessTokenSecret, idthread, function (err, theTopTweet) {
-		if (err) {
-			callback (err);
-			}
-		else {
-			var theThread = { //this is what we return to caller
-				author: {
-					name: theTopTweet.user.name,
-					description: theTopTweet.user.description,
-					screenname: theTopTweet.user.screen_name,
-					when: normalizeTimeString (theTopTweet.created_at),
-					url: getTweetUrl (theTopTweet),
-					id: theTopTweet.id_str
-					},
-				tweets: new Array ()
-				};
-			function pushTweet (theTweet) {
-				theThread.tweets.push ({
-					text: theTweet.full_text,
-					id: theTweet.id_str,
-					when: normalizeTimeString (theTweet.created_at),
-					parent: theTweet.in_reply_to_status_id_str
-					});
+function getThread (accessToken, accessTokenSecret, idthread, flreload, callback) { //3/11/21 by DW
+	var fcache = config.cacheFolder + "threads/" + idthread + ".json";
+	function getThreadFromTwitter () {
+		getTweet (accessToken, accessTokenSecret, idthread, function (err, theTopTweet) {
+			if (err) {
+				callback (err);
 				}
-			function isInThread (theTweet) {
-				var flInThread = false, idInReplyTo = theTweet.in_reply_to_status_id_str;
-				theThread.tweets.forEach (function (item) { //return true if it's in reply to something already in thread
-					if (item.id == idInReplyTo) {
-						flInThread = true;
-						}
-					});
-				return (flInThread);
-				}
-			pushTweet (theTopTweet);
-			get24HoursOfTweets (theTopTweet.user.screen_name, accessToken, accessTokenSecret, function (err, theTimeline) {
-				if (err) {
-					callback (err);
+			else {
+				var theThread = { //this is what we return to caller
+					author: {
+						name: theTopTweet.user.name,
+						description: theTopTweet.user.description,
+						screenname: theTopTweet.user.screen_name,
+						when: normalizeTimeString (theTopTweet.created_at),
+						url: getTweetUrl (theTopTweet),
+						id: theTopTweet.id_str
+						},
+					tweets: new Array ()
+					};
+				function pushTweet (theTweet) {
+					theThread.tweets.push ({
+						text: theTweet.full_text,
+						id: theTweet.id_str,
+						when: normalizeTimeString (theTweet.created_at),
+						parent: theTweet.in_reply_to_status_id_str
+						});
 					}
-				else {
-					for (var i = theTimeline.length - 1; i >= 0; i--) {
-						var theTweet = theTimeline [i];
-						if (isInThread (theTweet)) {
-							pushTweet (theTweet);
+				function isInThread (theTweet) {
+					var flInThread = false, idInReplyTo = theTweet.in_reply_to_status_id_str;
+					theThread.tweets.forEach (function (item) { //return true if it's in reply to something already in thread
+						if (item.id == idInReplyTo) {
+							flInThread = true;
 							}
+						});
+					return (flInThread);
+					}
+				pushTweet (theTopTweet);
+				get24HoursOfTweets (theTopTweet.user.screen_name, accessToken, accessTokenSecret, function (err, theTimeline) {
+					if (err) {
+						callback (err);
 						}
+					else {
+						for (var i = theTimeline.length - 1; i >= 0; i--) {
+							var theTweet = theTimeline [i];
+							if (isInThread (theTweet)) {
+								pushTweet (theTweet);
+								}
+							}
+						utils.sureFilePath (fcache, function () {
+							fs.writeFile (fcache, utils.jsonStringify (theThread), function (err) { 
+								if (err) {
+									console.log ("getThread: err.message == " + err.message);
+									}
+								});
+							});
+						callback (undefined, theThread);
+						}
+					});
+				}
+			});
+		}
+	if (flreload) { 
+		getThreadFromTwitter ();
+		}
+	else {
+		fs.readFile (fcache, function (err, jsontext) {
+			if (err) {
+				getThreadFromTwitter ();
+				}
+			else {
+				try {
+					var theThread = JSON.parse (jsontext);
 					callback (undefined, theThread);
 					}
-				});
-			}
-		});
+				catch (err) {
+					console.log ("getThread: error reading from cache == " + err.message);
+					getThreadFromTwitter ();
+					}
+				}
+			});
+		}
 	}
 
 function handleRequest (theRequest) {
@@ -488,7 +518,7 @@ function handleRequest (theRequest) {
 				getTweet (token, secret, params.id, httpReturn)
 				return;
 			case "/getthread": //3/12/21 by DW
-				getThread (token, secret, params.id, httpReturn)
+				getThread (token, secret, params.id, utils.getBoolean (params.reload), httpReturn)
 				return;
 			}
 		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
