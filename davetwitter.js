@@ -1,4 +1,4 @@
-var myVersion = "0.5.29", myProductName = "davetwitter"; 
+var myVersion = "0.5.34", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -15,6 +15,7 @@ exports.normalizeTimeString = normalizeTimeString; //3/11/21 by DW
 exports.getTweetUrl = getTweetUrl; //3/12/21 by DW
 exports.getTweet = getTweet; //3/8/21 by DW
 exports.getThread = getThread; //3/11/21 by DW
+exports.getRecentTweets = getRecentTweets; //3/13/21 by DW
 
 var config = {
 	httpPort: 1401,
@@ -167,6 +168,82 @@ function getTweet (accessToken, accessTokenSecret, id, callback) { //3/11/21 by 
 			});
 		});
 	}
+function getRecentTweets (screenname, accessToken, accessTokenSecret, callback) {
+	var flcancelled = false, lastidseen = undefined;
+	function getTwentyTweets (sinceid, callback) {
+		var twitter = newTwitter ();
+		var params = {
+			screen_name: screenname, 
+			trim_user: "false",
+			tweet_mode: "extended"
+			};
+		if (sinceid !== undefined) {
+			params.max_id = sinceid;
+			}
+		newTwitter ().getTimeline ("user", params, accessToken, accessTokenSecret, function (err, data, response) {
+			if (err) {
+				console.log ("getRecentTweets: err == " + utils.jsonStringify (err));
+				callback (err);
+				}
+			else {
+				callback (undefined, data);
+				}
+			});
+		}
+	function visitTwentyTweets (sinceid, callback) {
+		getTwentyTweets (lastidseen, function (err, theTweets) {
+			if (err) {
+				callback (err);
+				}
+			else {
+				if (theTweets !== undefined) {
+					for (var i = 0; i < theTweets.length; i++) {
+						var item = theTweets [i];
+						lastidseen = item.id_str;
+						if (!callback (undefined, item)) {
+							flcancelled = true;
+							break;
+							}
+						}
+					if (!flcancelled) { //the search continues
+						visitTwentyTweets (lastidseen, callback); //recurse
+						}
+					}
+				}
+			});
+		}
+	visitTwentyTweets (undefined, callback);
+	}
+function get24HoursOfTweets (screenname, accessToken, accessTokenSecret, callback) { //8/23/20 by DW
+	const secs24Hours = 60 * 60 * 24;
+	var theTweets = new Array (), flFoundFirst = false;
+	function tweetNotInArray (id) {
+		var flnotthere = true;
+		theTweets.forEach (function (item) {
+			if (item.id_str == id) {
+				flnotthere = false;
+				}
+			});
+		return (flnotthere);
+		}
+	getRecentTweets (screenname, accessToken, accessTokenSecret, function (err, item) {
+		if (err) {
+			callback (err);
+			}
+		else {
+			if (utils.secondsSince (item.created_at) > secs24Hours) {
+				callback (undefined, theTweets);
+				return (false); //stop searching
+				}
+			else {
+				if (tweetNotInArray (item.id_str)) { //this method returns one element twice for every batch of 20 read
+					theTweets.push (item);
+					}
+				return (true); //keep searching
+				}
+			}
+		});
+	}
 function normalizeTimeString (when) { //3/11/21 by DW -- return a GMT-based time string
 	when = new Date (when);
 	return (when.toUTCString ());
@@ -214,7 +291,7 @@ function getThread (accessToken, accessTokenSecret, idthread, callback) { //3/11
 				return (flInThread);
 				}
 			pushTweet (theTopTweet);
-			getTimeline (accessToken, accessTokenSecret, "user_timeline", theTopTweet.user.id_str, idthread, function (err, theTimeline) {
+			get24HoursOfTweets (theTopTweet.user.screen_name, accessToken, accessTokenSecret, function (err, theTimeline) {
 				if (err) {
 					callback (err);
 					}
