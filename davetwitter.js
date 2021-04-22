@@ -1,4 +1,4 @@
-var myVersion = "0.6.0", myProductName = "davetwitter"; 
+var myVersion = "0.6.2", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -55,8 +55,14 @@ function normalizeTimeString (when) { //3/11/21 by DW -- return a GMT-based time
 	return (when.toUTCString ());
 	}
 function getTheTwitterError (twitterErrorStruct) { //3/18/21 by DW
-	var data  = JSON.parse (twitterErrorStruct.data);
-	return (data.errors [0]);
+	try {
+		var data  = JSON.parse (twitterErrorStruct.data);
+		return (data.errors [0]);
+		}
+	catch (err) {
+		console.log ("getTheTwitterError: twitterErrorStruct == " + utils.jsonStringify (twitterErrorStruct));
+		return (err);
+		}
 	}
 function getScreenName (accessToken, accessTokenSecret, callback) {
 	for (var i = 0; i < screenNameCache.length; i++) { //see if we can get it from the cache first
@@ -122,6 +128,17 @@ function getUserInfo (accessToken, accessTokenSecret, screenname, callback) { //
 			}
 		});
 	}
+function getUserInfoFromUserId (accessToken, accessTokenSecret, userid, callback) { //4/8/21 by DW -- xxx
+	var params = {user_id: userid};
+	newTwitter ().users ("show", params, accessToken, accessTokenSecret, function (err, data, response) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, data);
+			}
+		});
+	}
 function getAccountSettings (accessToken, accessTokenSecret, callback) { //3/18/21 by DW
 	newTwitter ().account ("settings", {}, accessToken, accessTokenSecret, function (err, data) {
 		if (err) {
@@ -151,8 +168,6 @@ function getRateLimitStatus (accessToken, accessTokenSecret, resources, callback
 function getSupportedLanguages (accessToken, accessTokenSecret, callback) {
 	newTwitter ().help ("languages", {}, accessToken, accessTokenSecret, callback);
 	}
-
-
 function sendTweet (accessToken, accessTokenSecret, status, inReplyToId, callback) {
 	var params = {
 		status: status, 
@@ -555,9 +570,6 @@ function handleRequest (theRequest) {
 			case "/getuserprofile": case "/getuserinfo":
 				getUserInfo (token, secret, screenname, httpReturn);
 				return;
-			case "/getuserprofile": case "/getuserinfo":
-				getUserInfo (token, secret, screenname, httpReturn);
-				return;
 			case "/derefurl": //11/19/17 by DW
 				var shortUrl = theRequest.params.url;
 				getScreenName (token, secret, function (screenName) {
@@ -659,6 +671,9 @@ function handleRequest (theRequest) {
 				return;
 			case "/getratelimitstatus": //3/20/21 by DW
 				getRateLimitStatus (token, secret, params.resources, httpTwitterReturn);
+				return;
+			case "/getuserinfofromuserid": //4/8/21 by DW
+				getUserInfoFromUserId (token, secret, params.id, httpReturn);
 				return;
 			}
 		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
