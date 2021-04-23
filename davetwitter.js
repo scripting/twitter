@@ -1,4 +1,4 @@
-var myVersion = "0.6.2", myProductName = "davetwitter"; 
+var myVersion = "0.6.6", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -41,6 +41,7 @@ var config = {
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
+var cachedTwitterConfig = undefined; //4/22/21 by DW
 
 function newTwitter (myCallback) {
 	var twitter = new twitterAPI ({
@@ -160,7 +161,138 @@ function setAccountSettings (accessToken, accessTokenSecret, theSettings, callba
 		});
 	}
 function getConfiguration (accessToken, accessTokenSecret, callback) {
-	newTwitter ().help ("configuration", {}, accessToken, accessTokenSecret, callback);
+	const oldConfiguration = {
+		
+			"dm_text_character_limit": 10000,
+			"characters_reserved_per_media": 24,
+			"max_media_per_upload": 1,
+			"non_username_paths": [
+				"about",
+				"account",
+				"accounts",
+				"activity",
+				"all",
+				"announcements",
+				"anywhere",
+				"api_rules",
+				"api_terms",
+				"apirules",
+				"apps",
+				"auth",
+				"badges",
+				"blog",
+				"business",
+				"buttons",
+				"contacts",
+				"devices",
+				"direct_messages",
+				"download",
+				"downloads",
+				"edit_announcements",
+				"faq",
+				"favorites",
+				"find_sources",
+				"find_users",
+				"followers",
+				"following",
+				"friend_request",
+				"friendrequest",
+				"friends",
+				"goodies",
+				"help",
+				"home",
+				"i",
+				"im_account",
+				"inbox",
+				"invitations",
+				"invite",
+				"jobs",
+				"list",
+				"login",
+				"logo",
+				"logout",
+				"me",
+				"mentions",
+				"messages",
+				"mockview",
+				"newtwitter",
+				"notifications",
+				"nudge",
+				"oauth",
+				"phoenix_search",
+				"positions",
+				"privacy",
+				"public_timeline",
+				"related_tweets",
+				"replies",
+				"retweeted_of_mine",
+				"retweets",
+				"retweets_by_others",
+				"rules",
+				"saved_searches",
+				"search",
+				"sent",
+				"sessions",
+				"settings",
+				"share",
+				"signup",
+				"signin",
+				"similar_to",
+				"statistics",
+				"terms",
+				"tos",
+				"translate",
+				"trends",
+				"tweetbutton",
+				"twttr",
+				"update_discoverability",
+				"users",
+				"welcome",
+				"who_to_follow",
+				"widgets",
+				"zendesk_auth",
+				"media_signup"
+			],
+			"photo_size_limit": 3145728,
+			"photo_sizes": {
+				"thumb": {
+					"h": 150,
+					"resize": "crop",
+					"w": 150
+				},
+				"small": {
+					"h": 480,
+					"resize": "fit",
+					"w": 340
+				},
+				"medium": {
+					"h": 1200,
+					"resize": "fit",
+					"w": 600
+				},
+				"large": {
+					"h": 2048,
+					"resize": "fit",
+					"w": 1024
+				}
+			},
+			"short_url_length": 23,
+			"short_url_length_https": 23
+		}
+	if (cachedTwitterConfig !== undefined) {
+		callback (undefined, cachedTwitterConfig);
+		}
+	else {
+		newTwitter ().help ("configuration", {}, accessToken, accessTokenSecret, function (err, data) {
+			if (err) {
+				callback (undefined, oldConfiguration);
+				}
+			else {
+				cachedTwitterConfig = data;
+				}
+			callback (err, data);
+			});
+		}
 	}
 function getRateLimitStatus (accessToken, accessTokenSecret, resources, callback) { //3/20/21 by DW
 	newTwitter ().rateLimitStatus ({resources}, accessToken, accessTokenSecret, callback);
