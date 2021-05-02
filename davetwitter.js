@@ -1,4 +1,4 @@
-var myVersion = "0.6.6", myProductName = "davetwitter"; 
+var myVersion = "0.6.7", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -20,6 +20,7 @@ exports.getFollowed = getFollowed; //3/17/21 by DW
 exports.getAccountSettings = getAccountSettings; //3/18/21 by DW
 exports.setAccountSettings = setAccountSettings; //3/20/21 by DW
 
+
 var config = {
 	httpPort: 1401,
 	myDomain: "localhost",
@@ -37,7 +38,8 @@ var config = {
 		},
 	blockedAddresses: new Array (), //4/17/18 by DW
 	cacheFolder: "data/cache/", //3/11/21 by DW
-	flUseCache: true //3/11/21 by DW
+	flUseCache: true, //3/11/21 by DW
+	flServerEnabled: true //5/2/21 by DW
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
@@ -51,6 +53,7 @@ function newTwitter (myCallback) {
 		});
 	return (twitter);
 	}
+
 function normalizeTimeString (when) { //3/11/21 by DW -- return a GMT-based time string
 	when = new Date (when);
 	return (when.toUTCString ());
@@ -821,19 +824,25 @@ function start (configParam, callback) {
 			}
 		}
 	console.log ("davetwitter.start: config == " + utils.jsonStringify (config));
-	
-	var httpConfig = {
-		port: config.httpPort,
-		flLogToConsole: config.flLogToConsole,
-		flAllowAccessFromAnywhere: config.flAllowAccessFromAnywhere,
-		flPostEnabled: config.flPostEnabled,
-		blockedAddresses: config.blockedAddresses //4/17/18 by DW
-		};
-	davehttp.start (httpConfig, function (theRequest) {
-		handleRequest (theRequest);
-		});
-	
-	if (callback !== undefined) { //12/31/17 by DW
-		callback ();
+	if (config.flServerEnabled) { //5/2/21 by DW
+		var httpConfig = {
+			port: config.httpPort,
+			flLogToConsole: config.flLogToConsole,
+			flAllowAccessFromAnywhere: config.flAllowAccessFromAnywhere,
+			flPostEnabled: config.flPostEnabled,
+			blockedAddresses: config.blockedAddresses //4/17/18 by DW
+			};
+		davehttp.start (httpConfig, function (theRequest) {
+			handleRequest (theRequest);
+			});
+		if (callback !== undefined) { 
+			callback ();
+			}
 		}
+	else {
+		if (callback !== undefined) { 
+			callback ();
+			}
+		}
+	
 	}
