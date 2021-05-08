@@ -1,4 +1,4 @@
-var myVersion = "0.6.7", myProductName = "davetwitter"; 
+var myVersion = "0.6.9", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -19,6 +19,8 @@ exports.getFollowers = getFollowers; //3/17/21 by DW
 exports.getFollowed = getFollowed; //3/17/21 by DW
 exports.getAccountSettings = getAccountSettings; //3/18/21 by DW
 exports.setAccountSettings = setAccountSettings; //3/20/21 by DW
+exports.getUserLists = getUserLists; //5/5/21 by DW
+exports.getListMembers = getListMembers; //5/5/21 by DW
 
 
 var config = {
@@ -605,6 +607,150 @@ function getThread (accessToken, accessTokenSecret, idthread, flreload, callback
 		}
 	}
 
+
+function getInfoAboutList (rawDataObject) { //so there's consistency in info we return about lists -- 5/7/21 by DW
+	var returnedStruct = {
+		name: rawDataObject.name,
+		id: rawDataObject.id_str,
+		uri: rawDataObject.iuri,
+		screenname: rawDataObject.user.screen_name,
+		whenCreated: rawDataObject.created_at,
+		ctMembers: rawDataObject.member_count,
+		flPrivate: rawDataObject.mode != "public"
+		};
+	return (returnedStruct);
+	}
+function getUserLists (accessToken, accessTokenSecret, screenname, callback) { //5/5/21 by DW
+	var params = {
+		screen_name: screenname
+		};
+	newTwitter ().lists ("list", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			let listOfLists = new Array;
+			data.forEach (function (item) {
+				listOfLists.push (getInfoAboutList (item));
+				});
+			callback (undefined, listOfLists);
+			}
+		});
+	}
+function getListMembers (accessToken, accessTokenSecret, listid, callback) { //5/5/21 by DW
+	var params = {
+		list_id: listid, 
+		count: 5000
+		};
+	newTwitter ().lists ("members", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			var returnedArray = new Array ();
+			data.users.forEach (function (item) {
+				returnedArray.push (item.screen_name);
+				});
+			callback (undefined, returnedArray);
+			}
+		});
+	}
+function getListInfo (accessToken, accessTokenSecret, listid, callback) { //5/7/21 by DW
+	var params = {
+		list_id: listid
+		};
+	newTwitter ().lists ("show", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, getInfoAboutList (data));
+			}
+		});
+	}
+function addMemberToList (accessToken, accessTokenSecret, listid, screenname, callback) { //5/7/21 by DW
+	var params = {
+		list_id: listid,
+		screen_name: screenname
+		};
+	newTwitter ().lists ("members/create", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, getInfoAboutList (data));
+			}
+		});
+	}
+function addGroupToList (accessToken, accessTokenSecret, listid, listOfScreennames, callback) { //5/7/21 by DW
+	var params = {
+		list_id: listid,
+		screen_name: listOfScreennames
+		};
+	console.log ("addGroupToList: params == " + utils.jsonStringify (params));
+	newTwitter ().lists ("members/create_all", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, getInfoAboutList (data));
+			}
+		});
+	}
+function removeUserFromList (accessToken, accessTokenSecret, listid, screenname, callback) { //5/7/21 by DW
+	var params = {
+		list_id: listid,
+		screen_name: screenname
+		};
+	newTwitter ().lists ("members/destroy", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, getInfoAboutList (data));
+			}
+		});
+	}
+function removeGroupFromList (accessToken, accessTokenSecret, listid, listOfScreennames, callback) { //5/7/21 by DW
+	var params = {
+		list_id: listid,
+		screen_name: listOfScreennames
+		};
+	newTwitter ().lists ("members/create_all", params, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, getInfoAboutList (data));
+			}
+		});
+	}
+function updateListInfo (accessToken, accessTokenSecret, listid, jsontext, callback) { //5/7/21 by DW
+	var theInfo;
+	try {
+		theInfo = JSON.parse (jsontext);
+		}
+	catch (err) {
+		callback (err);
+		return;
+		}
+	theInfo.list_id = listid;
+	theInfo.mode = (utils.getBoolean (theInfo.flPrivate)) ? "private" : "public";
+	if (theInfo.flPrivate !== undefined) {
+		delete theInfo.flPrivate;
+		}
+	console.log ("updateListInfo: theInfo = " + utils.jsonStringify (theInfo));
+	newTwitter ().lists ("update", theInfo, accessToken, accessTokenSecret, function (err, data) {
+		if (err) {
+			callback (getTheTwitterError (err));
+			}
+		else {
+			callback (undefined, getInfoAboutList (data));
+			}
+		});
+	}
+
+
 function handleRequest (theRequest) {
 	var params = theRequest.params;
 	const token = params.oauth_token;
@@ -809,6 +955,30 @@ function handleRequest (theRequest) {
 				return;
 			case "/getuserinfofromuserid": //4/8/21 by DW
 				getUserInfoFromUserId (token, secret, params.id, httpReturn);
+				return;
+			case "/getuserlists": //5/5/21 by DW
+				getUserLists (token, secret, params.screenname, httpReturn);
+				return;
+			case "/getlistmembers": //5/7/21 by DW
+				getListMembers (token, secret, params.id, httpReturn);
+				return;
+			case "/getlistinfo": //5/7/21 by DW
+				getListInfo (token, secret, params.id, httpReturn);
+				return;
+			case "/addmembertolist": //5/7/21 by DW
+				addMemberToList (token, secret, params.id, params.screenname, httpReturn);
+				return;
+			case "/addgrouptolist": //5/7/21 by DW
+				addGroupToList (token, secret, params.id, params.listofscreennames, httpReturn);
+				return;
+			case "/removeuserfromlist": //5/7/21 by DW
+				removeUserFromList (token, secret, params.id, params.screenname, httpReturn);
+				return;
+			case "/removegroupfromlist": //5/7/21 by DW
+				removeGroupFromList (token, secret, params.id, params.listofscreennames, httpReturn);
+				return;
+			case "/updatelistinfo": //5/7/21 by DW
+				updateListInfo (token, secret, params.id, params.info, httpReturn);
 				return;
 			}
 		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
