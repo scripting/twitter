@@ -1,4 +1,4 @@
-var myVersion = "0.6.9", myProductName = "davetwitter"; 
+var myVersion = "0.6.25", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -70,6 +70,48 @@ function getTheTwitterError (twitterErrorStruct) { //3/18/21 by DW
 		return (err);
 		}
 	}
+function getInfoAboutTweet (rawDataObject) { //so there's consistency in info we return about tweets -- 5/8/21 by DW
+	var screenname = rawDataObject.user.screen_name;
+	var id = rawDataObject.id_str;
+	var idParent = rawDataObject.in_reply_to_status_id_str;
+	
+	if (idParent !== undefined) {
+		if (idParent == null) {
+			idParent = undefined;
+			}
+		}
+	var returnedStruct = {
+		text: rawDataObject.full_text,
+		id,
+		screenname,
+		link: "https://twitter.com/" + screenname + "/status/" + id,
+		when: normalizeTimeString (rawDataObject.created_at),
+		idParent
+		};
+	return (returnedStruct);
+	}
+function getInfoAboutUser (user) { 
+	var url = undefined;
+	try {
+		url = theTweet.user.entities.url.urls [0].expanded_url;
+		}
+	catch (err) {
+		}
+	var returnedStruct = {
+		screenname: user.screen_name,
+		name: user.name,
+		id: user.id_str,
+		description: user.description,
+		url,
+		location: user.location,
+		whenCreated: normalizeTimeString (user.created_at),
+		ctFollowers: user.followers_count,
+		ctFollowed: user.friends_count,
+		ctFavorites: user.favourites_count,
+		ctTweets: user.statuses_count
+		};
+	return (returnedStruct);
+	}
 function getScreenName (accessToken, accessTokenSecret, callback) {
 	for (var i = 0; i < screenNameCache.length; i++) { //see if we can get it from the cache first
 		var obj = screenNameCache [i];
@@ -134,6 +176,18 @@ function getUserInfo (accessToken, accessTokenSecret, screenname, callback) { //
 			}
 		});
 	}
+
+function getUserInfoForVerb (accessToken, accessTokenSecret, screenname, callback) { //5/8/21 by DW
+	getUserInfo (accessToken, accessTokenSecret, screenname, function (err, data) {
+		if (err) {
+			callback (err);
+			}
+		else {
+			callback (undefined, getInfoAboutUser (data));
+			}
+		});
+	}
+
 function getUserInfoFromUserId (accessToken, accessTokenSecret, userid, callback) { //4/8/21 by DW -- xxx
 	var params = {user_id: userid};
 	newTwitter ().users ("show", params, accessToken, accessTokenSecret, function (err, data, response) {
@@ -308,7 +362,8 @@ function getSupportedLanguages (accessToken, accessTokenSecret, callback) {
 function sendTweet (accessToken, accessTokenSecret, status, inReplyToId, callback) {
 	var params = {
 		status: status, 
-		in_reply_to_status_id: inReplyToId
+		in_reply_to_status_id: inReplyToId,
+		tweet_mode: "extended"
 		};
 	newTwitter ().statuses ("update", params, accessToken, accessTokenSecret, function (err, data) {
 		if (err) {
@@ -319,6 +374,18 @@ function sendTweet (accessToken, accessTokenSecret, status, inReplyToId, callbac
 			}
 		});
 	}
+
+function sendTweetForVerb (accessToken, accessTokenSecret, status, inReplyToId, callback) { //5/8/21 by DW
+	sendTweet (accessToken, accessTokenSecret, status, inReplyToId, function (err, data) {
+		if (err) {
+			callback (err);
+			}
+		else {
+			callback (undefined, getInfoAboutTweet (data));
+			}
+		});
+	}
+
 function getFollowers (accessToken, accessTokenSecret, screenname, callback) { //3/17/21 by DW
 	var twitter = newTwitter (), theFollowersList = new Array ();
 	function getNextBatch (nextcursor) {
@@ -391,12 +458,19 @@ function getTimeline (accessToken, accessTokenSecret, whichTimeline, userId, sin
 	}
 function getTimelineForHttp (accessToken, accessTokenSecret, params, callback) { //3/21/21 by DW
 	params.tweet_mode = "extended";
+	if (params.trim_user !== undefined) {
+		delete params.trim_user;
+		}
 	newTwitter ().getTimeline (params.whichtimeline, params, accessToken, accessTokenSecret, function (err, data) {
 		if (err) {
 			callback (getTheTwitterError (err));
 			}
 		else {
-			callback (undefined, data);
+			var returnedTimeline = new Array ();
+			data.forEach (function (item) {
+				returnedTimeline.push (getInfoAboutTweet (item));
+				});
+			callback (undefined, returnedTimeline);
 			}
 		});
 	}
@@ -438,6 +512,16 @@ function getTweet (accessToken, accessTokenSecret, id, callback) { //3/11/21 by 
 					}
 				}
 			});
+		});
+	}
+function getTweetForVerb (accessToken, accessTokenSecret, id, callback) {
+	getTweet (accessToken, accessTokenSecret, id, function (err, data) {
+		if (err) {
+			callback (err);
+			}
+		else {
+			callback (undefined, getInfoAboutTweet (data));
+			}
 		});
 	}
 function getRecentTweets (screenname, accessToken, accessTokenSecret, callback) {
@@ -534,22 +618,16 @@ function getThread (accessToken, accessTokenSecret, idthread, flreload, callback
 			else {
 				var theThread = { //this is what we return to caller
 					author: {
-						name: theTopTweet.user.name,
-						description: theTopTweet.user.description,
 						screenname: theTopTweet.user.screen_name,
-						when: normalizeTimeString (theTopTweet.created_at),
-						url: getTweetUrl (theTopTweet),
-						id: theTopTweet.id_str
+						name: theTopTweet.user.name,
+						id: theTopTweet.user.id_str,
+						description: theTopTweet.user.description,
+						url: getTweetUrl (theTopTweet)
 						},
 					tweets: new Array ()
 					};
 				function pushTweet (theTweet) {
-					theThread.tweets.push ({
-						text: theTweet.full_text,
-						id: theTweet.id_str,
-						when: normalizeTimeString (theTweet.created_at),
-						parent: theTweet.in_reply_to_status_id_str
-						});
+					theThread.tweets.push (getInfoAboutTweet (theTweet));
 					}
 				function isInThread (theTweet) {
 					var flInThread = false, idInReplyTo = theTweet.in_reply_to_status_id_str;
@@ -611,8 +689,9 @@ function getThread (accessToken, accessTokenSecret, idthread, flreload, callback
 function getInfoAboutList (rawDataObject) { //so there's consistency in info we return about lists -- 5/7/21 by DW
 	var returnedStruct = {
 		name: rawDataObject.name,
+		link: "https://twitter.com" + rawDataObject.uri,
+		description: rawDataObject.description,
 		id: rawDataObject.id_str,
-		uri: rawDataObject.iuri,
 		screenname: rawDataObject.user.screen_name,
 		whenCreated: rawDataObject.created_at,
 		ctMembers: rawDataObject.member_count,
@@ -851,6 +930,9 @@ function handleRequest (theRequest) {
 			case "/getuserprofile": case "/getuserinfo":
 				getUserInfo (token, secret, screenname, httpReturn);
 				return;
+			case "/getuserinfoforverb": //5/8/21 by DW
+				getUserInfoForVerb (token, secret, screenname, httpReturn);
+				return;
 			case "/derefurl": //11/19/17 by DW
 				var shortUrl = theRequest.params.url;
 				getScreenName (token, secret, function (screenName) {
@@ -908,6 +990,9 @@ function handleRequest (theRequest) {
 			case "/tweet": //12/14/18 by DW
 				sendTweet (token, secret, params.status, params.in_reply_to_status_id, httpReturn);
 				return;
+			case "/sendtweetforverb": //5/8/21 by DW
+				sendTweetForVerb (token, secret, params.status, params.in_reply_to_status_id, httpReturn);
+				return;
 			case "/getmymentions": //2/11/21 by DW
 				getTimeline (token, secret, "mentions", params.user_id, params.since_id, httpReturn)
 				return;
@@ -916,6 +1001,9 @@ function handleRequest (theRequest) {
 				return;
 			case "/gettweet": //3/8/21 by DW
 				getTweet (token, secret, params.id, httpReturn)
+				return;
+			case "/gettweetforverb": //5/8/21 by DW
+				getTweetForVerb (token, secret, params.id, httpReturn)
 				return;
 			case "/getthread": //3/12/21 by DW
 				getThread (token, secret, params.id, utils.getBoolean (params.reload), httpReturn)
