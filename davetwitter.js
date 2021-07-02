@@ -1,4 +1,4 @@
-var myVersion = "0.6.25", myProductName = "davetwitter"; 
+var myVersion = "0.6.27", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -21,6 +21,7 @@ exports.getAccountSettings = getAccountSettings; //3/18/21 by DW
 exports.setAccountSettings = setAccountSettings; //3/20/21 by DW
 exports.getUserLists = getUserLists; //5/5/21 by DW
 exports.getListMembers = getListMembers; //5/5/21 by DW
+exports.getInfoAboutTweet = getInfoAboutTweet; //6/5/21 by DW
 
 
 var config = {
@@ -46,6 +47,7 @@ var config = {
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
 var cachedTwitterConfig = undefined; //4/22/21 by DW
+const secsInTwelveHours = 60 * 60 * 12;
 
 function newTwitter (myCallback) {
 	var twitter = new twitterAPI ({
@@ -55,7 +57,6 @@ function newTwitter (myCallback) {
 		});
 	return (twitter);
 	}
-
 function normalizeTimeString (when) { //3/11/21 by DW -- return a GMT-based time string
 	when = new Date (when);
 	return (when.toUTCString ());
@@ -608,6 +609,7 @@ function getTweetUrl (theTweet) { //3/12/21 by DW
 		return (undefined);
 		}
 	}
+
 function getThread (accessToken, accessTokenSecret, idthread, flreload, callback) { //3/11/21 by DW
 	var fcache = config.cacheFolder + "threads/" + idthread + ".json";
 	function getThreadFromTwitter () {
@@ -663,6 +665,28 @@ function getThread (accessToken, accessTokenSecret, idthread, flreload, callback
 				}
 			});
 		}
+	function gotFromCache () { //6/23/21 by DW
+		let flreturn = false;
+		try {
+			let jsontext = fs.readFileSync (fcache);
+			let theThread = JSON.parse (jsontext);
+			if (jstruct.tweets.length > 0) {
+				let when = jstruct.tweets [0].when;
+				if ((utils.secondsSince (when) >= secsInTwelveHours) || (!flreload)) {
+					callback (undefined, theThread);
+					return (true); //we got it from the cache
+					}
+				}
+			}
+		catch (err) {
+			}
+		return (false); //didn't get it from the cache
+		}
+	
+	if (gotFromCache ()) { //6/23/21 by DW
+		return;
+		}
+	
 	if (flreload) { 
 		getThreadFromTwitter ();
 		}
@@ -684,7 +708,6 @@ function getThread (accessToken, accessTokenSecret, idthread, flreload, callback
 			});
 		}
 	}
-
 
 function getInfoAboutList (rawDataObject) { //so there's consistency in info we return about lists -- 5/7/21 by DW
 	var returnedStruct = {
