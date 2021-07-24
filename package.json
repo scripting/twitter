@@ -2,7 +2,7 @@
 	"name": "davetwitter", 
 	"description": "Basic twitter functionality for server apps.",
 	"author": "Dave Winer <dave@scripting.com>",
-	"version": "0.6.27",
+	"version": "0.6.29",
 	"main": "davetwitter.js",
 	"files": [
 		"davetwitter.js"
@@ -17,6 +17,7 @@
 	"dependencies" : {
 		"request": "*",
 		"node-twitter-api": "*",
+		"opml": "*",
 		"davehttp": "*",
 		"daveutils": "*"
 		}, 

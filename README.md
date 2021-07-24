@@ -4,7 +4,11 @@ A simple identity server that can be dropped into other server apps.
 
 ### Changes
 
-#### 0.5.28 -- 3/12/21 by DW
+#### 0.6.29 -- 7/24/21 by DW
+
+Added /daytweets call for Get My Tweets functionality used by Drummer. 
+
+#### 0.6.28 -- 3/12/21 by DW
 
 New calls to get one tweet, which amazingly was not part of this package until today, and a call to get a thread.
 

@@ -1,10 +1,11 @@
-var myVersion = "0.6.27", myProductName = "davetwitter"; 
+var myVersion = "0.6.29", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
 const utils = require ("daveutils");
 const request = require ("request");
 const davehttp = require ("davehttp");
+const opml = require ("opml"); //7/24/21 by DW
 exports.start = start; 
 exports.getScreenName = getScreenName;
 exports.getUserInfo = getUserInfo; //1/2/18 by DW
@@ -42,7 +43,9 @@ var config = {
 	blockedAddresses: new Array (), //4/17/18 by DW
 	cacheFolder: "data/cache/", //3/11/21 by DW
 	flUseCache: true, //3/11/21 by DW
-	flServerEnabled: true //5/2/21 by DW
+	flServerEnabled: true,//5/2/21 by DW
+	flRemoveLineBreaksInOPML: true, //7/24/21 by DW
+	dataFolder: "data/" //7/24/21 by DW
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
@@ -387,6 +390,14 @@ function sendTweetForVerb (accessToken, accessTokenSecret, status, inReplyToId, 
 		});
 	}
 
+function getTweetUrl (theTweet) { //3/12/21 by DW
+	try {
+		return (theTweet.user.entities.url.urls [0].expanded_url);
+		}
+	catch (err) {
+		return (undefined);
+		}
+	}
 function getFollowers (accessToken, accessTokenSecret, screenname, callback) { //3/17/21 by DW
 	var twitter = newTwitter (), theFollowersList = new Array ();
 	function getNextBatch (nextcursor) {
@@ -601,13 +612,105 @@ function get24HoursOfTweets (screenname, accessToken, accessTokenSecret, callbac
 			}
 		});
 	}
-function getTweetUrl (theTweet) { //3/12/21 by DW
-	try {
-		return (theTweet.user.entities.url.urls [0].expanded_url);
+function twentyFourHoursTweetRequest (screenname, theDay, accessToken, accessTokenSecret, callback) { //7/24/21 by DW
+	function sortTweets (theTweets) {
+		var now = new Date ();
+		function hack (s) { //can't have \n's in text
+			return (utils.replaceAll (s, "\n", " "))
+			}
+		var theOutline = {
+			opml: {
+				head: {
+					title: "Today's tweets",
+					dateCreated: now,
+					dateModified: now
+					},
+				body: {
+					subs: [
+						{
+							text: "Original tweets",
+							subs: [
+								]
+							},
+						{
+							text: "Links",
+							subs: [
+								]
+							},
+						{
+							text: "Replies",
+							subs: [
+								]
+							},
+						{
+							text: "RTs",
+							subs: [
+								]
+							}
+						]
+					}
+				}
+			};
+		var originals = theOutline.opml.body.subs [0].subs;
+		var links = theOutline.opml.body.subs [1].subs;
+		var replies = theOutline.opml.body.subs [2].subs;
+		var rts = theOutline.opml.body.subs [3].subs;
+		theTweets.forEach (function (tweet) {
+			function pushLink (item) {
+				}
+			var item = {
+				text: hack (tweet.full_text),
+				type: "tweet",
+				created: tweet.created_at,
+				tweetId: tweet.id_str,
+				tweetUserName: tweet.user.screen_name
+				}
+			
+			if (tweet.entities.urls.length > 0) { //use the OPML link type to represent the item
+				let urlstruct = tweet.entities.urls [0];
+				item.text = utils.replaceAll (item.text, urlstruct.url, ""); //pop the url off the text
+				item.type = "link";
+				item.url = urlstruct.expanded_url;
+				links.push (item);
+				}
+			else {
+				if (tweet.retweeted_status !== undefined) {
+					rts.push (item);
+					}
+				else {
+					if (tweet.in_reply_to_status_id != null) {
+						replies.push (item);
+						}
+					else {
+						originals.push (item);
+						}
+					}
+				}
+			
+			});
+		fs.writeFile (config.dataFolder + "debug/theOutline.json", utils.jsonStringify (theOutline), function (err) {
+			});
+		return (theOutline);
 		}
-	catch (err) {
-		return (undefined);
+	function tweetsToOpml (screenname, theDay, theTweets) {
+		if (config.flRemoveLineBreaksInOPML) { //8/23/20 by DW
+			theTweets.forEach (function (item) {
+				item.full_text = utils.replaceAll (item.full_text, "\n\n", "");
+				});
+			}
+		var opmltext = opml.stringify (sortTweets (theTweets));
+		opmltext = utils.replaceAll (opmltext, "ISO-8859-1", "UTF-8");
+		return (opmltext);
 		}
+	get24HoursOfTweets (screenname, accessToken, accessTokenSecret, function (err, theTweets) {
+		if (err) {
+			callback (err);
+			}
+		else {
+			var opmltext = tweetsToOpml (screenname, theDay, theTweets);
+			callback (undefined, opmltext);
+			}
+		});
 	}
 
 function getThread (accessToken, accessTokenSecret, idthread, flreload, callback) { //3/11/21 by DW
@@ -884,6 +987,14 @@ function handleRequest (theRequest) {
 			returnData (jstruct);
 			}
 		}
+	function httpReturnXml (err, xmltext) { //7/24/21 by DW
+		if (err) {
+			returnError (err);
+			}
+		else {
+			theRequest.httpReturn (200, "text/xml", xmltext.toString ());
+			}
+		}
 	function httpTwitterReturn (err, jstruct) { //3/20/21 by DW
 		if (err) {
 			returnError (getTheTwitterError (err));
@@ -1090,6 +1201,9 @@ function handleRequest (theRequest) {
 				return;
 			case "/updatelistinfo": //5/7/21 by DW
 				updateListInfo (token, secret, params.id, params.info, httpReturn);
+				return;
+			case "/daytweets": //7/24/21 by DW
+				twentyFourHoursTweetRequest (params.screenname, params.theDay, params.accessToken, params.accessTokenSecret, httpReturnXml);
 				return;
 			}
 		if (!config.http404Callback (theRequest)) { //1/24/21 by DW
