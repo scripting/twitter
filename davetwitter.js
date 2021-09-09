@@ -1,4 +1,4 @@
-var myVersion = "0.6.29", myProductName = "davetwitter"; 
+var myVersion = "0.6.31", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -112,7 +112,8 @@ function getInfoAboutUser (user) {
 		ctFollowers: user.followers_count,
 		ctFollowed: user.friends_count,
 		ctFavorites: user.favourites_count,
-		ctTweets: user.statuses_count
+		ctTweets: user.statuses_count,
+		urlProfileImage: user.profile_image_url //9/9/21 by DW
 		};
 	return (returnedStruct);
 	}
