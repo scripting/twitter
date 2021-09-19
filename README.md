@@ -4,6 +4,10 @@ A simple identity server that can be dropped into other server apps.
 
 ### Changes
 
+#### 0.6.35 -- 9/19/21 by DW
+
+Overhaul of /derefurl call.
+
 #### 0.6.31 -- 9/9/21 by DW
 
 Added new property to the standard user struct, urlProfileImage. 

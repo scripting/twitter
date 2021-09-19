@@ -1,4 +1,4 @@
-var myVersion = "0.6.31", myProductName = "davetwitter"; 
+var myVersion = "0.6.35", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -955,7 +955,38 @@ function updateListInfo (accessToken, accessTokenSecret, listid, jsontext, callb
 			}
 		});
 	}
-
+function derefUrl (token, secret, urlOrig, timeoutSecs, callback) { //9/19/21 by DW
+	timeoutSecs = (timeoutSecs === undefined) ? 3 : timeoutSecs;
+	getScreenName (token, secret, function (screenName) {
+		if (screenName === undefined) {
+			callback ({message: "Can't get the deref the URL because the accessToken is not valid."});
+			}
+		else {
+			var theRequest = {
+				method: "HEAD", 
+				url: urlOrig, 
+				followAllRedirects: true,
+				maxRedirects: 5,
+				timeout: timeoutSecs * 1000, 
+				headers: {
+					"User-Agent": myProductName + " v" + myVersion
+					}
+				};
+			request (theRequest, function (err, response) {
+				if (err) {
+					callback ({message: "Can't get the deref the URL because the there was an error connecting with the server."});
+					}
+				else {
+					var theResponse = {
+						url: urlOrig,
+						longurl: response.request.href
+						};
+					callback (undefined, theResponse);
+					}
+				});
+			}
+		});
+	}
 
 function handleRequest (theRequest) {
 	var params = theRequest.params;
@@ -1069,31 +1100,7 @@ function handleRequest (theRequest) {
 				getUserInfoForVerb (token, secret, screenname, httpReturn);
 				return;
 			case "/derefurl": //11/19/17 by DW
-				var shortUrl = theRequest.params.url;
-				getScreenName (token, secret, function (screenName) {
-					if (screenName === undefined) {
-						theRequest.httpReturn (500, "text/plain", "Can't get the deref the URL because the accessToken is not valid.");
-						}
-					else {
-						var myRequest = {
-							method: "HEAD", 
-							url: shortUrl, 
-							followAllRedirects: true
-							};
-						request (myRequest, function (error, response) {
-							if (error) {
-								theRequest.httpReturn (500, "text/plain", "Can't get the deref the URL because there was an error making the HTTP request.");
-								}
-							else {
-								var myResponse = {
-									url: shortUrl,
-									longurl: response.request.href
-									};
-								theRequest.httpReturn (200, "application/json", utils.jsonStringify (myResponse));
-								}
-							});
-						}
-					});
+				derefUrl (token, secret, theRequest.params.url, theRequest.params.timeoutsecs, httpReturn);
 				return;
 			case "/getembedcode": //11/10/18 by DW
 				//https://dev.twitter.com/docs/api/1/get/statuses/oembed
