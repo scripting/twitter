@@ -4,6 +4,14 @@ A simple identity server that can be dropped into other server apps.
 
 ### Changes
 
+#### 0.6.36 -- 2/22/22 by DW
+
+New function -- getTweetHistory. 
+
+All the data you need to build an RSS feed out of a Twitter account. 
+
+Use in conjunction with <a href="https://www.npmjs.com/package/daverss">daverss</a>. 
+
 #### 0.6.35 -- 9/19/21 by DW
 
 Overhaul of /derefurl call.

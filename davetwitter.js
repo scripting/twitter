@@ -1,4 +1,4 @@
-var myVersion = "0.6.35", myProductName = "davetwitter"; 
+var myVersion = "0.6.36", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -23,7 +23,7 @@ exports.setAccountSettings = setAccountSettings; //3/20/21 by DW
 exports.getUserLists = getUserLists; //5/5/21 by DW
 exports.getListMembers = getListMembers; //5/5/21 by DW
 exports.getInfoAboutTweet = getInfoAboutTweet; //6/5/21 by DW
-
+exports.getTweetHistory = getTweetHistory; //2/22/22 by DW
 
 var config = {
 	httpPort: 1401,
@@ -711,6 +711,152 @@ function twentyFourHoursTweetRequest (screenname, theDay, accessToken, accessTok
 			var opmltext = tweetsToOpml (screenname, theDay, theTweets);
 			callback (undefined, opmltext);
 			}
+		});
+	}
+function getTweetHistory (optionsParam, callback) { //2/22/22 by DW
+	const options = {
+		screenname: undefined,
+		token: undefined,
+		secret: undefined, 
+		maxSavedTweets: 50,
+		usersfolder: "data/users/",
+		fnamestats: "stats.json",
+		fnameprefs: "prefs.json",
+		fnametweets: "tweets.json"
+		}
+	for (var x in optionsParam) {
+		options [x] = optionsParam [x];
+		}
+	var userfolder = options.usersfolder + options.screenname + "/";
+	var now = new Date (), date0 = new Date (0), ctNewTweets = 0;
+	
+	var stats = {
+		ctUpdates: 0,
+		whenLastUpdate: date0,
+		ctErrors: 0,
+		lastErrorMessage: undefined,
+		whenLastError: date0,
+		idLastTweet: undefined,
+		ctTweets: 0,
+		whenLastTweet: date0
+		};
+	var prefs = {
+		enabled: true,
+		token: options.token, 
+		secret: options.secret
+		};
+	function readObject (fname, obj, callback) {
+		var f = userfolder + fname;
+		utils.sureFilePath (f, function () {
+			fs.readFile (f, function (err, jsontext) {
+				if (!err) {
+					try {
+						var jstruct = JSON.parse (jsontext);
+						for (var x in jstruct) {
+							obj [x] = jstruct [x];
+							}
+						}
+					catch (err) {
+						}
+					}
+				callback ();
+				});
+			});
+		}
+	function writeObject (fname, obj, callback) {
+		fs.writeFile (userfolder + fname, utils.jsonStringify (obj), function (err) {
+			if (callback !== undefined) {
+				callback (err);
+				}
+			});
+		}
+	function readTheirTweets (callback) {
+		function getTwitterUserId (callback) {
+			if (stats.idTwitterUser !== undefined) {
+				callback (undefined, stats.idTwitterUser);
+				}
+			else {
+				getUserInfo (prefs.token, prefs.secret, options.screenname, function (err, data) {
+					if (err) {
+						callback (err);
+						}
+					else {
+						stats.idTwitterUser = data.id_str;
+						callback (undefined, stats.idTwitterUser);
+						}
+					});
+				}
+			}
+		function saveTweets (theTimeline, callback) {
+			var theTweets = new Array ();
+			readObject (options.fnametweets, theTweets, function () {
+				for (var i = theTimeline.length - 1; i >= 0; i--) {
+					var item = theTimeline [i], info = getInfoAboutTweet (item);
+					theTweets.unshift (info); //insert at beginning of array
+					}
+				while (theTweets.length > options.maxSavedTweets) {
+					theTweets.pop ();
+					}
+				writeObject (options.fnametweets, theTweets, function (err) {
+					if (err) {
+						if (callback !== undefined) {
+							callback (err);
+							}
+						}
+					else {
+						if (callback !== undefined) {
+							callback (undefined, theTweets);
+							}
+						}
+					});
+				});
+			}
+		getTwitterUserId (function (err, userId) {
+			if (err) {
+				callback (err);
+				}
+			else {
+				getTimeline (prefs.token, prefs.secret, "user", userId, stats.idLastTweet, function (err, theTimeline) {
+					if (err) {
+						stats.ctErrors++;
+						stats.lastErrorMessage = err.message;
+						stats.whenLastError = now;
+						console.log ("readTheirTweets: userId == " + userId + ", err.message == " + err.message);
+						callback (err);
+						}
+					else {
+						if (theTimeline.length > 0) {
+							stats.ctTweets += theTimeline.length;
+							stats.whenLastTweet = now;
+							stats.idLastTweet = theTimeline [0].id_str; 
+							}
+						saveTweets (theTimeline, callback);
+						}
+					})
+				}
+			})
+		}
+	readObject (options.fnamestats, stats, function () {
+		stats.ctUpdates++;
+		stats.whenLastUpdate = now;
+		readObject (options.fnameprefs, prefs, function () {
+			if (prefs.enabled) { 
+				console.log ("\nChecking " + options.screenname + ": " + now.toLocaleTimeString ());
+				readTheirTweets (function (err, theTweets) {
+					writeObject (options.fnameprefs, prefs);
+					writeObject (options.fnamestats, stats);
+					if (callback !== undefined) {
+						callback (undefined, theTweets); 
+						}
+					});
+				}
+			else {
+				console.log ("\nNot checking " + options.screenname + " because it is not enabled: " + now.toLocaleTimeString ());
+				if (callback !== undefined) {
+					callback (undefined, new Array ()); 
+					}
+				}
+			});
 		});
 	}
 
