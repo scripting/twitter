@@ -4,6 +4,12 @@ A simple identity server that can be dropped into other server apps.
 
 ### Changes
 
+#### 0.6.37 -- 6/30/22 by DW
+
+Twitter turned off the API that getConfiguration was using. 
+
+We already had a good fallback implemented for errors, so we just use that to provide the info to apps. 
+
 #### 0.6.36 -- 2/22/22 by DW
 
 New function -- getTweetHistory. 

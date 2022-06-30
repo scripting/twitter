@@ -1,4 +1,4 @@
-var myVersion = "0.6.36", myProductName = "davetwitter"; 
+var myVersion = "0.6.37", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -49,7 +49,6 @@ var config = {
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
-var cachedTwitterConfig = undefined; //4/22/21 by DW
 const secsInTwelveHours = 60 * 60 * 12;
 
 function newTwitter (myCallback) {
@@ -343,20 +342,7 @@ function getConfiguration (accessToken, accessTokenSecret, callback) {
 			"short_url_length": 23,
 			"short_url_length_https": 23
 		}
-	if (cachedTwitterConfig !== undefined) {
-		callback (undefined, cachedTwitterConfig);
-		}
-	else {
-		newTwitter ().help ("configuration", {}, accessToken, accessTokenSecret, function (err, data) {
-			if (err) {
-				callback (undefined, oldConfiguration);
-				}
-			else {
-				cachedTwitterConfig = data;
-				}
-			callback (err, data);
-			});
-		}
+	callback (undefined, oldConfiguration); //6/30/22 by DW
 	}
 function getRateLimitStatus (accessToken, accessTokenSecret, resources, callback) { //3/20/21 by DW
 	newTwitter ().rateLimitStatus ({resources}, accessToken, accessTokenSecret, callback);
