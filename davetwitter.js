@@ -1,4 +1,4 @@
-var myVersion = "0.6.37", myProductName = "davetwitter"; 
+var myVersion = "0.6.38", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -45,7 +45,9 @@ var config = {
 	flUseCache: true, //3/11/21 by DW
 	flServerEnabled: true,//5/2/21 by DW
 	flRemoveLineBreaksInOPML: true, //7/24/21 by DW
-	dataFolder: "data/" //7/24/21 by DW
+	dataFolder: "data/", //7/24/21 by DW
+	userLogonCallback: function (options) { //8/14/22 by DW
+		}
 	};
 var requestTokens = []; //used in the OAuth dance
 var screenNameCache = []; 
@@ -1219,6 +1221,13 @@ function handleRequest (theRequest) {
 						
 						theRequest.sysResponse.writeHead (302, {"location": url});
 						theRequest.sysResponse.end ("302 REDIRECT");    
+						
+						config.userLogonCallback ({ //8/14/22 by DW
+							token: accessToken, 
+							secret: accessTokenSecret,
+							screenname: results.screen_name,
+							userid: results.user_id
+							});
 						}
 					});
 				return;

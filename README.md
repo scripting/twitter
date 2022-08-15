@@ -4,6 +4,10 @@ A simple identity server that can be dropped into other server apps.
 
 ### Changes
 
+#### 0.6.38 -- 8/14/22 by DW
+
+New userLogonCallback callback. Called when the user has successfully logged in via Twitter. We send up the stack the information about the login, the user's screenname, userid, token and secret. 
+
 #### 0.6.37 -- 6/30/22 by DW
 
 Twitter turned off the API that getConfiguration was using. 
