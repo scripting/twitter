@@ -1,4 +1,4 @@
-var myVersion = "0.6.38", myProductName = "davetwitter"; 
+var myVersion = "0.6.39", myProductName = "davetwitter"; 
 
 const fs = require ("fs");
 const twitterAPI = require ("node-twitter-api");
@@ -1376,6 +1376,9 @@ function start (configParam, callback) {
 			flPostEnabled: config.flPostEnabled,
 			blockedAddresses: config.blockedAddresses //4/17/18 by DW
 			};
+		if (config.urlFavicon !== undefined) { //1/26/23 by DW
+			httpConfig.urlFavicon = config.urlFavicon;
+			}
 		davehttp.start (httpConfig, function (theRequest) {
 			handleRequest (theRequest);
 			});
